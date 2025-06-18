@@ -21,12 +21,15 @@ const ContentstackViewer = () => {
       setError(null);
 
       const response = await fetch(
-        `https://cdn.contentstack.io/v3/content_types/page/entries/blt1a1a19f70f2675ed?environment=${stackConfig.environment}`,
+        `https://cdn.contentstack.io/v3/content_types/page/entries/blt1a1a19f70f2675ed?environment=${stackConfig.environment}&live_preview=true&include_fallback=true`,
         {
           headers: {
             'api_key': stackConfig.api_key,
             'access_token': stackConfig.delivery_token,
-          }
+            'branch': 'main'
+          },
+          // Prevent caching to always get fresh content
+          cache: 'no-store'
         }
       );
 
@@ -45,12 +48,13 @@ const ContentstackViewer = () => {
       }
     } catch (err) {
       console.error('Error fetching from Contentstack:', err);
-      setError(err.message || 'Failed to fetch entry');
+      setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, []); // Empty dependency array since stackConfig is now outside the component
+  }, []);
 
+  // Fetch content on initial load
   useEffect(() => {
     fetchEntriesFromContentstack();
   }, [fetchEntriesFromContentstack]);
