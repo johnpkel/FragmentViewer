@@ -1,5 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
+
+// Contentstack configuration
+const stackConfig = {
+  api_key: 'blt80dc93420b90938f',
+  delivery_token: 'cs39d0b8027160dbc7a2dfc680', 
+  environment: 'preview',
+  region: 'us'
+};
 
 const ContentstackViewer = () => {
   const [entries, setEntries] = useState([]);
@@ -7,144 +15,45 @@ const ContentstackViewer = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Contentstack configuration
-  const stackConfig = {
-    api_key: 'blt80dc93420b90938f',
-    delivery_token: 'cs39d0b8027160dbc7a2dfc680', 
-    environment: 'preview',
-    region: 'us'
-  };
-
-  useEffect(() => {
-    fetchEntriesFromContentstack();
-  }, []);
-
-  const fetchEntriesFromContentstack = async () => {
+  const fetchEntriesFromContentstack = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      // If Contentstack SDK is not available, fall back to REST API
-      if (typeof window !== 'undefined' && !window.Contentstack) {
-        await loadContentstackSDK();
-      }
-
-      let entriesData;
-      
-      if (window.Contentstack) {
-        // Use Contentstack SDK
-        const Stack = window.Contentstack.Stack({
-          api_key: stackConfig.api_key,
-          delivery_token: stackConfig.delivery_token,
-          environment: stackConfig.environment,
-          region: stackConfig.region
-        });
-
-        const Query = Stack.ContentType('page').Query();
-        const result = await Query.includeReference('image').includeReference('blocks.block.image').find();
-        entriesData = result[0];
-      } else {
-        // Fallback to REST API
-        const response = await fetch(
-          `https://${stackConfig.region}-cdn.contentstack.com/v3/content_types/page/entries?environment=${stackConfig.environment}&include_reference=image,blocks.block.image`,
-          {
-            headers: {
-              'api_key': stackConfig.api_key,
-              'access_token': stackConfig.delivery_token
-            }
+      const response = await fetch(
+        `https://cdn.contentstack.io/v3/content_types/page/entries/blt1a1a19f70f2675ed?environment=${stackConfig.environment}`,
+        {
+          headers: {
+            'api_key': stackConfig.api_key,
+            'access_token': stackConfig.delivery_token,
           }
-        );
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
         }
-        
-        const data = await response.json();
-        entriesData = data.entries;
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      setEntries(entriesData || []);
-      if (entriesData && entriesData.length > 0) {
-        setSelectedEntry(entriesData[0]);
+      const data = await response.json();
+      console.log('Contentstack Response:', data);
+
+      if (data && data.entry) {
+        setEntries([data.entry]);
+        setSelectedEntry(data.entry);
+      } else {
+        setError('No entry found');
       }
     } catch (err) {
-      console.error('Error fetching Contentstack data:', err);
-      setError(err.message);
-      // Load sample data as fallback
-      loadSampleData();
+      console.error('Error fetching from Contentstack:', err);
+      setError(err.message || 'Failed to fetch entry');
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // Empty dependency array since stackConfig is now outside the component
 
-  const loadContentstackSDK = () => {
-    return new Promise((resolve, reject) => {
-      if (window.Contentstack) {
-        resolve();
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/contentstack@3.16.0/dist/web/contentstack.min.js';
-      script.onload = resolve;
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
-  };
-
-  const loadSampleData = () => {
-    // Fallback sample data
-    const sampleEntries = [
-      {
-        "title": "Contentstack Kickstart",
-        "url": "/",
-        "description": "This is an entry for a Contentstack Kickstart",
-        "image": {
-          "url": "https://images.contentstack.io/v3/assets/blt80dc93420b90938f/blt0e4cebc884272b9a/6850afabbe0dc9b594da84d9/contentstack-kickstarts.jpg",
-          "title": "contentstack-kickstarts.jpg"
-        },
-        "blocks": [
-          {
-            "block": {
-              "title": "This is a modular block",
-              "copy": "<p>Contentstack <a href=\"https://www.contentstack.com/docs/developers/create-content-types/modular-blocks\" target=\"_blank\">Modular Blocks</a> allow you to dynamically create, arrange, and reuse content components within a single field, offering flexibility for building complex page layouts without changes to the content type structure.</p>",
-              "image": {
-                "url": "https://images.contentstack.io/v3/assets/blt80dc93420b90938f/blt3c131413b7e72593/6850afab188a47a37d1ab009/csLogo_640x360.jpg",
-                "title": "csLogo_640x360.jpg"
-              },
-              "layout": "image_left"
-            }
-          },
-          {
-            "block": {
-              "title": "Check out the Academy",
-              "copy": "<p>Contentstack offers courses and explainers on how to use the platform. Check out the course on <a href=\"https://www.contentstack.com/academy/courses/content-modeling\" target=\"_blank\">content modeling</a> and the more <a href=\"https://www.contentstack.com/academy/explore?filter=%5B%7B%22uid%22%3A%22coding%22%2C%22parentUid%22%3A%22content_type%22%7D%5D&page=1\" target=\"_blank\">development specific videos</a>.</p>",
-              "image": {
-                "url": "https://images.contentstack.io/v3/assets/blt80dc93420b90938f/bltb77b2039e1af4f1b/6850afacb1a14c7310813eba/Opengraph_B.png",
-                "title": "Opengraph_B.png"
-              },
-              "layout": "image_right"
-            }
-          },
-          {
-            "block": {
-              "title": "Join the community",
-              "copy": "<p>The <a href=\"https://community.contentstack.com\" target=\"_blank\">community</a> connects you with a vibrant network of like-minded developers to show off your work or to ask any questions.</p>",
-              "image": {
-                "url": "https://images.contentstack.io/v3/assets/blt80dc93420b90938f/blt9661d0c954b0a56d/6850afacd3664e442a5a8415/discord-logo.webp",
-                "title": "discord-logo.webp"
-              },
-              "layout": "image_left"
-            }
-          }
-        ],
-        "uid": "blt1a1a19f70f2675ed"
-      }
-    ];
-
-    setEntries(sampleEntries);
-    setSelectedEntry(sampleEntries[0]);
-  };
+  useEffect(() => {
+    fetchEntriesFromContentstack();
+  }, [fetchEntriesFromContentstack]);
 
   const stripHtml = (html) => {
     return html.replace(/<[^>]*>/g, '');
@@ -247,7 +156,31 @@ This block serves as an informational component that combines textual content wi
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading Contentstack entries...</p>
+          <p className="text-gray-600">Loading Contentstack entry...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-lg mx-auto p-4">
+          <div className="text-red-500 text-xl mb-4">Error Loading Entry</div>
+          <div className="text-gray-700 mb-4">{error}</div>
+          <div className="text-sm text-gray-500">
+            Please check your Contentstack configuration and make sure the entry exists.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!selectedEntry) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-gray-700">No entry found</div>
         </div>
       </div>
     );
