@@ -1,13 +1,30 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import Contentstack from 'contentstack';
+import ContentstackLivePreview from '@contentstack/live-preview-utils';
 import './App.css';
 
 // Contentstack configuration
 const stackConfig = {
   api_key: 'blt80dc93420b90938f',
-  delivery_token: 'cs39d0b8027160dbc7a2dfc680', 
+  delivery_token: 'cs39d0b8027160dbc7a2dfc680',
+  preview_token: 'csbdabd17071a6977d776e5550',
   environment: 'preview',
   region: 'us'
 };
+
+// Initialize Contentstack Stack with Live Preview configuration
+const Stack = Contentstack.Stack({
+  api_key: stackConfig.api_key,
+  delivery_token: stackConfig.delivery_token,
+  preview_token: stackConfig.preview_token,
+  environment: stackConfig.environment,
+  region: stackConfig.region,
+  live_preview: {
+    preview_token: stackConfig.preview_token, // Using delivery token as preview token
+    enable: true,
+    host: 'rest-preview.contentstack.com' // AWS NA region
+  }
+});
 
 const ContentstackViewer = () => {
   const [entries, setEntries] = useState([]);
@@ -19,29 +36,17 @@ const ContentstackViewer = () => {
       setLoading(true);
       setError(null);
 
-      // Fetch all entries for the 'page' content type
-      const response = await fetch(
-        `https://cdn.contentstack.io/v3/content_types/page/entries?environment=${stackConfig.environment}&live_preview=true&include_fallback=true`,
-        {
-          headers: {
-            'api_key': stackConfig.api_key,
-            'access_token': stackConfig.delivery_token,
-            'branch': 'main'
-          },
-          // Prevent caching to always get fresh content
-          cache: 'no-store'
-        }
-      );
+      // Use Contentstack SDK instead of direct fetch
+      const Query = Stack.ContentType('page').Query();
+      Query.toJSON();
+      Query.includeReference(['blocks.block']);
+      Query.includeMetadata();
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      const result = await Query.find();
+      console.log('Contentstack SDK Response:', result);
 
-      const data = await response.json();
-      console.log('Contentstack Response:', data);
-
-      if (data && data.entries && data.entries.length > 0) {
-        setEntries(data.entries);
+      if (result && result[0] && result[0].length > 0) {
+        setEntries(result[0]);
       } else {
         setError('No entries found');
       }
@@ -52,6 +57,33 @@ const ContentstackViewer = () => {
       setLoading(false);
     }
   }, []);
+
+  // Initialize Live Preview Utils SDK
+  useEffect(() => {
+    ContentstackLivePreview.init({
+      enable: true,
+      ssr: false, // Client-side rendering
+      mode: "builder",
+      stackSdk: Stack, // Required for CSR mode
+      stackDetails: {
+        apiKey: stackConfig.api_key,
+        environment: stackConfig.environment
+      },
+      clientUrlParams: {
+        host: "app.contentstack.com" // AWS NA region
+      },
+      editButton: {
+        enable: true,
+        position: 'top-right'
+      }
+    });
+
+    // Listen for live preview changes
+    ContentstackLivePreview.onEntryChange(() => {
+      console.log('Entry changed, fetching updated data...');
+      fetchEntriesFromContentstack();
+    });
+  }, [fetchEntriesFromContentstack]);
 
   // Fetch content on initial load
   useEffect(() => {
@@ -117,17 +149,26 @@ const ContentstackViewer = () => {
         >
           <div className="absolute inset-0 bg-black bg-opacity-50"></div>
           <div className="relative z-10 text-center text-white p-8 max-w-2xl mx-auto">
-            <h1 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
+            <h1 
+              className="text-4xl md:text-5xl font-bold mb-6 leading-tight"
+              {...(entry.$?.headline ?? entry.$?.title ?? {})}
+            >
               {entry.headline || entry.title || '[Headline]'}
             </h1>
             
             {descriptionText && (
-              <p className="text-lg md:text-xl mb-8 opacity-90 leading-relaxed">
+              <p 
+                className="text-lg md:text-xl mb-8 opacity-90 leading-relaxed"
+                {...(entry.blocks?.[0]?.$?.hero?.description ?? entry.$?.description ?? entry.$?.copy ?? {})}
+              >
                 {typeof descriptionText === 'string' ? stripHtml(descriptionText) : '[Description]'}
               </p>
             )}
             
-            <button className="bg-transparent border-2 border-white text-white hover:bg-white hover:text-gray-900 font-semibold py-3 px-8 rounded-lg transition-colors duration-200">
+            <button 
+              className="bg-transparent border-2 border-white text-white hover:bg-white hover:text-gray-900 font-semibold py-3 px-8 rounded-lg transition-colors duration-200"
+              {...(entry.$?.button_text ?? entry.$?.cta_text ?? {})}
+            >
               {entry.button_text || entry.cta_text || 'Button Text'}
             </button>
           </div>
@@ -151,15 +192,22 @@ const ContentstackViewer = () => {
             src={image?.url || ''} 
             alt={image?.title || title || 'Block image'}
             className="w-full h-full object-cover rounded-lg"
+            {...(block.$?.block?.image ?? {})}
             onError={(e) => {
-              e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xMiA4QzEzLjEgOCAxNCA4LjkgMTQgMTBDMTQgMTEuMSAxMy4xIDEyIDEyIDEyQzEwLjkgMTIgMTAgMTEuMSAxMCAxMEMxMCA4LjkgMTAuOSA4IDEyIDhaIiBmaWxsPSIjOUNBM0FGIi8+CjxwYXRoIGQ9Ek0yMSAxOVYxN0MyMSAxNS45IDIwLjEgMTUgMTkgMTVIMTdMMTUuNSAxMy41QzE1LjEgMTMuMSAxNC40IDEzLjEgMTQgMTMuNUwxMiAxNS41TDkuNSAxM0M5LjEgMTIuNiA4LjQgMTIuNiA4IDEzTDUgMTZIM0MyIDMuOTcgMy45NyAzIDUgM0gxOUMyMC4wMyAzIDIxIDMuOTcgMjEgNVYxOVoiIGZpbGw9IiM5Q0EzQUYiLz4KPC9zdmc+';
+              e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xMiA4QzEzLjEgOCAxNCA4LjkgMTQgMTBDMTQgMTEuMSAxMy4xIDEyIDEyIDEyQzEwLjkgMTIgMTAgMTEuMSAxMCAxMEMxMCA4LjkgMTAuOSA4IDEyIDhaIiBmaWxsPSIjOUNBM0FGIi8+CjxwYXRoIGQ9Ik0yMSAxOVYxN0MyMSAxNS45IDIwLjEgMTUgMTkgMTVIMTdMMTUuNSAxMy41QzE1LjEgMTMuMSAxNC40IDEzLjEgMTQgMTMuNUwxMiAxNS41TDkuNSAxM0M5LjEgMTIuNiA8LjQgMTIuNiA4IDEzTDUgMTZIM0MyIDMuOTcgMy45NyAzIDUgM0gxOUMyMC4wMyAzIDIxIDMuOTcgMjEgNVYxOVoiIGZpbGw9IiM5Q0EzQUYiLz4KPC9zdmc+';
             }}
           />
         </div>
         <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">{title || 'Untitled Block'}</h3>
+          <h3 
+            className="text-lg font-semibold text-gray-900 mb-2"
+            {...(block.$?.block?.title ?? {})}
+          >
+            {title || 'Untitled Block'}
+          </h3>
           <div 
             className="text-gray-700 prose prose-sm text-sm"
+            {...(block.$?.block?.copy ?? {})}
             dangerouslySetInnerHTML={{ __html: copy || 'No content available' }}
           />
         </div>
@@ -203,17 +251,26 @@ const ContentstackViewer = () => {
           >
             <div className="absolute inset-0 bg-black bg-opacity-50"></div>
             <div className="relative z-10 text-white p-3 h-full flex flex-col justify-center">
-              <h3 className="text-sm font-bold mb-2 leading-tight">
+              <h3 
+                className="text-sm font-bold mb-2 leading-tight"
+                {...(entry.$?.headline ?? entry.$?.title ?? {})}
+              >
                 {entry.headline || entry.title || '[Headline]'}
               </h3>
               {descriptionText && (
-                <p className="text-xs opacity-90 mb-2 leading-tight">
+                <p 
+                  className="text-xs opacity-90 mb-2 leading-tight"
+                  {...(entry.blocks?.[0]?.$?.hero?.description ?? entry.$?.description ?? entry.$?.copy ?? {})}
+                >
                   {typeof descriptionText === 'string' ? 
                     stripHtml(descriptionText).substring(0, 60) + '...' : 
                     '[Description]'}
                 </p>
               )}
-              <button className="bg-transparent border border-white text-white text-xs py-1 px-2 rounded text-center inline-block">
+              <button 
+                className="bg-transparent border border-white text-white text-xs py-1 px-2 rounded text-center inline-block"
+                {...(entry.$?.button_text ?? entry.$?.cta_text ?? {})}
+              >
                 {entry.button_text || entry.cta_text || 'Button'}
               </button>
             </div>
@@ -247,18 +304,27 @@ const ContentstackViewer = () => {
           <div className="w-16 h-1 bg-gray-600 rounded-full"></div>
         </div>
         <div className="p-3 space-y-3">
-          <h3 className="text-sm font-semibold text-gray-900">{title || 'Untitled Block'}</h3>
+          <h3 
+            className="text-sm font-semibold text-gray-900"
+            {...(block.$?.block?.title ?? {})}
+          >
+            {title || 'Untitled Block'}
+          </h3>
           <div className="w-full h-20">
             <img 
               src={image?.url || ''} 
               alt={image?.title || title || 'Block image'}
               className="w-full h-full object-cover rounded"
+              {...(block.$?.block?.image ?? {})}
               onError={(e) => {
-                e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xMiA4QzEzLjEgOCAxNCA4LjkgMTQgMTBDMTQgMTEuMSAxMy4xIDEyIDEyIDEyQzEwLjkgMTIgMTAgMTEuMSAxMCAxMEMxMCA4LjkgMTAuOSA4IDEyIDhaIiBmaWxsPSIjOUNBM0FGIi8+CjxwYXRoIGQ9Ik0yMSAxOVYxN0MyMSAxNS45IDIwLjEgMTUgMTkgMTVIMTdMMTUuNSAxMy41QzE1LjEgMTMuMSAxNC40IDEzLjEgMTQgMTMuNUwxMiAxNS41TDkuNSAxM0M5LjEgMTIuNiA4LjQgMTIuNiA4IDEzTDUgMTZIM0MyIDMuOTcgMy45NyAzIDUgM0gxOUMyMC4wMyAzIDIxIDMuOTcgMjEgNVYxOVoiIGZpbGw9IiM5Q0EzQUYiLz4KPC9zdmc+';
+                e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjI0IiBoZWlnaHQ9IjI0IiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xMiA4QzEzLjEgOCAxNCA4LjkgMTQgMTBDMTQgMTEuMSAxMy4xIDEyIDEyIDEyQzEwLjkgMTIgMTAgMTEuMSAxMCAxMEMxMCA4LjkgMTAuOSA4IDEyIDhaIiBmaWxsPSIjOUNBM0FGIi8+CjxwYXRoIGQ9Ik0yMSAxOVYxN0MyMSAxNS45IDIwLjEgMTUgMTkgMTVIMTdMMTUuNSAxMy41QzE1LjEgMTMuMSAxNC40IDEzLjEgMTQgMTMuNUwxMiAxNS41TDkuNSAxM0M5LjEgMTIuNiA8LjQgMTIuNiA4IDEzTDUgMTZIM0MyIDMuOTcgMy45NyAzIDUgM0gxOUMyMC4wMyAzIDIxIDMuOTcgMjEgNVYxOVoiIGZpbGw9IiM5Q0EzQUYiLz4KPC9zdmc+';
               }}
             />
           </div>
-          <div className="text-xs text-gray-700 leading-tight">
+          <div 
+            className="text-xs text-gray-700 leading-tight"
+            {...(block.$?.block?.copy ?? {})}
+          >
             {copy ? stripHtml(copy).substring(0, 120) + '...' : 'No content available'}
           </div>
         </div>
@@ -400,7 +466,12 @@ This block serves as an informational component that combines textual content wi
       {/* Header */}
       <div className="bg-white shadow-sm border-b">
         <div className="px-6 py-4">
-          <h1 className="text-2xl font-bold text-gray-900">Contentstack Modular Blocks Viewer</h1>
+          <h1 
+            className="text-2xl font-bold text-gray-900"
+            {...(entries[0]?.$?.title ?? {})}
+          >
+            Contentstack Modular Blocks Viewer with Visual Builder
+          </h1>
           <p className="text-gray-600">Stack: {stackConfig.api_key}</p>
           <div className="mt-2 text-sm text-gray-500">
             Fragment/DMO: image + title + desc ({entries.length} entries found)
@@ -436,10 +507,13 @@ This block serves as an informational component that combines textual content wi
       {/* Content Blocks from All Entries */}
       <div className="p-6 space-y-6">
         {entries.map((entry, entryIndex) => (
-          <div key={entry.uid}>
+          <div key={entry.uid} {...(entry.$?.blocks ?? {})}>
             {/* Entry Header */}
             <div className="mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 mb-2">
+              <h2 
+                className="text-xl font-semibold text-gray-900 mb-2"
+                {...(entry.$?.title ?? {})}
+              >
                 Entry: {entry.title || `Entry ${entryIndex + 1}`}
               </h2>
               <p className="text-sm text-gray-600">UID: {entry.uid}</p>
@@ -448,9 +522,12 @@ This block serves as an informational component that combines textual content wi
             {/* Blocks for this entry */}
             {entry.blocks && entry.blocks.length > 0 ? (
               entry.blocks.map((block, blockIndex) => (
-                <div key={`${entry.uid}-${blockIndex}`} className="bg-white rounded-lg shadow-sm border overflow-hidden mb-4">
+                <div key={`${entry.uid}-${blockIndex}`} className="bg-white rounded-lg shadow-sm border overflow-hidden mb-4" {...(block.$ ?? {})}>
                   <div className="bg-gray-50 px-4 py-2 border-b">
-                    <h3 className="font-medium text-gray-900">
+                    <h3 
+                      className="font-medium text-gray-900"
+                      {...(block.$?.block?.title ?? {})}
+                    >
                       {entry.title || `Entry ${entryIndex + 1}`} - Block {blockIndex + 1}: {block.block?.title || 'Untitled Block'}
                     </h3>
                   </div>

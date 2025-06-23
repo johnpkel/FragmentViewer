@@ -1,70 +1,181 @@
-# Getting Started with Create React App
+# Contentstack Viewer with Visual Builder
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A React application that displays Contentstack entries with multi-view support and integrated Visual Builder for live editing.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- **Multi-View Display**: Web, Mobile, Agentforce (JSON), and RAG (Natural Language) views
+- **Visual Builder Integration**: Live editing capabilities with Contentstack's Visual Builder
+- **Live Preview**: Real-time content updates as you edit in Contentstack
+- **Modular Blocks Support**: Displays content blocks with proper edit tags
+- **Hero Fragment Support**: Special handling for hero components
 
-### `npm start`
+## Visual Builder Integration
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+This app includes full Visual Builder integration based on [Contentstack's documentation](https://www.contentstack.com/docs/developers/set-up-visual-builder/set-up-visual-builder-for-your-website):
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### What's Included:
 
-### `npm test`
+1. **Live Preview Utils SDK**: Enables real-time content editing
+2. **Edit Tags (data-cslp)**: Makes content editable in Visual Builder
+3. **Contentstack SDK**: Replaces direct API calls for better integration
+4. **Live Preview Configuration**: Configured for AWS NA region
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### How to Use Visual Builder:
 
-### `npm run build`
+1. **Start the Development Server**:
+   ```bash
+   npm start
+   ```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+2. **Access Visual Builder**:
+   - Go to your Contentstack dashboard
+   - Navigate to Visual Builder
+   - Add your development URL (typically `http://localhost:3000`)
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+3. **Live Editing**:
+   - Edit content in Visual Builder
+   - See changes reflected in real-time
+   - Edit button appears in top-right corner for quick editing
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Configuration Details:
 
-### `npm run eject`
+- **Region**: AWS NA (`rest-preview.contentstack.com`)
+- **Mode**: Client-Side Rendering (CSR)
+- **Edit Button**: Enabled in top-right position
+- **Live Preview**: Enabled with real-time updates
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Getting Started
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Prerequisites
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+- Node.js (v14 or higher)
+- npm or yarn
+- A Contentstack account with a configured stack
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### Installation
 
-## Learn More
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+3. Update the Contentstack configuration in `src/App.js`:
+   ```javascript
+   const stackConfig = {
+     api_key: 'your-api-key',
+     delivery_token: 'your-delivery-token',
+     environment: 'your-environment',
+     region: 'us' // or your region
+   };
+   ```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+4. Start the development server:
+   ```bash
+   npm start
+   ```
 
-### Code Splitting
+### Visual Builder Setup
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+1. **Prerequisites**: Ensure your Contentstack stack has:
+   - Content type: `page`
+   - Modular blocks field: `blocks`
+   - Referenced content types for blocks
 
-### Analyzing the Bundle Size
+2. **Configure Visual Builder**:
+   - In Contentstack, go to Visual Builder
+   - Add your development URL
+   - Configure the stack settings
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+3. **Edit Content**:
+   - Use the edit button (top-right corner)
+   - Edit content directly in Visual Builder
+   - Changes appear instantly in your app
 
-### Making a Progressive Web App
+## Content Structure
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+The app expects the following content structure:
 
-### Advanced Configuration
+- **Content Type**: `page`
+- **Fields**:
+  - `title` (text)
+  - `blocks` (modular blocks)
+  - `headline` (text, for hero fragments)
+  - `button_text` or `cta_text` (text)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+### Supported Block Types:
 
-### Deployment
+- **Hero Fragments**: Special hero components with background images
+- **Standard Blocks**: Text and image blocks with configurable layout
+- **Custom Blocks**: Extensible for additional block types
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+## Views Explained
 
-### `npm run build` fails to minify
+1. **Web View**: Desktop-optimized display of content blocks
+2. **Mobile View**: Mobile-responsive preview with phone frame
+3. **Agentforce View**: Raw JSON representation for API analysis
+4. **RAG View**: Natural language interpretation of content
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## Technologies Used
+
+- React 19.1.0
+- Contentstack SDK 3.25.3
+- Live Preview Utils SDK 3.2.4
+- Tailwind CSS 3.4.17
+- PostCSS & Autoprefixer
+
+## Development
+
+### Available Scripts
+
+- `npm start`: Runs the app in development mode
+- `npm build`: Builds the app for production
+- `npm test`: Runs the test suite
+- `npm eject`: Ejects from Create React App (one-way operation)
+
+### Visual Builder Development
+
+When developing with Visual Builder:
+
+1. Ensure your development server is running
+2. Add edit tags to new components: `{...(entry.$?.fieldName ?? {})}`
+3. Test live editing functionality
+4. Use browser console to debug Live Preview events
+
+## Troubleshooting
+
+### Common Issues:
+
+1. **Visual Builder not connecting**: Check your stack configuration and ensure the development URL is correct
+2. **Edit tags not working**: Verify field names match your Contentstack schema
+3. **Live Preview not updating**: Check console for errors and ensure proper SDK initialization
+
+### Debug Mode:
+
+Enable debug mode in the Live Preview configuration:
+```javascript
+ContentstackLivePreview.init({
+  // ... other config
+  debug: true
+});
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+## Support
+
+For issues related to:
+- **Contentstack**: Check [Contentstack Documentation](https://www.contentstack.com/docs/)
+- **Visual Builder**: See [Visual Builder Setup Guide](https://www.contentstack.com/docs/developers/set-up-visual-builder/set-up-visual-builder-for-your-website)
+- **Live Preview**: Review [Live Preview Documentation](https://www.contentstack.com/academy/learning-paths/contentstack-developer-certification/implementing-live-preview/live-preview-rest-delivery-sdk)
